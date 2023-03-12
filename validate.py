@@ -36,9 +36,14 @@ def main() -> None:
     print(f"Load VDSR model weights `{os.path.abspath(config.model_path)}` successfully.")
 
     # Create a folder of super-resolution experiment results
-    results_dir = os.path.join("results", "test", config.exp_name)
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
+    sr_results_dir = os.path.join("results", "test", config.exp_name, "sr")
+    if not os.path.exists(sr_results_dir):
+        os.makedirs(sr_results_dir)
+
+    lr_results_dir = os.path.join("results", "test", config.exp_name, "lr")
+    if not os.path.exists(lr_results_dir):
+        os.makedirs(lr_results_dir)
+
 
     # Start the verification mode of the model.
     model.eval()
@@ -56,18 +61,21 @@ def main() -> None:
     for index in range(total_files):
         sr_image_path = os.path.join(config.sr_dir, file_names[index])
         hr_image_path = os.path.join(config.hr_dir, file_names[index])
+        lr_image_path = os.path.join(config.lr_dir, file_names[index])
 
         print(f"Processing `{os.path.abspath(hr_image_path)}`...")
         # Make high-resolution image
-        hr_image = cv2.imread(hr_image_path).astype(np.float32) / 255.0
+        hr_image = cv2.imread(hr_image_path)
         hr_image_height, hr_image_width = hr_image.shape[:2]
         hr_image_height_remainder = hr_image_height % 12
         hr_image_width_remainder = hr_image_width % 12
         hr_image = hr_image[:hr_image_height - hr_image_height_remainder, :hr_image_width - hr_image_width_remainder, ...]
 
         # Make low-resolution image
-        lr_image = imgproc.imresize(hr_image, 1 / config.upscale_factor)
-        lr_image = imgproc.imresize(lr_image, config.upscale_factor)
+        lr_image = imgproc.dropHighFrequencies(hr_image, 1 / config.upscale_factor)
+
+        hr_image = hr_image.astype(np.float32) / 255.0
+        lr_image = lr_image.astype(np.float32) / 255.0
 
         # Convert BGR image to YCbCr image
         lr_ycbcr_image = imgproc.bgr2ycbcr(lr_image, use_y_channel=False)
@@ -92,8 +100,11 @@ def main() -> None:
         sr_y_image = imgproc.tensor2image(sr_y_tensor, range_norm=False, half=True)
         sr_y_image = sr_y_image.astype(np.float32) / 255.0
         sr_ycbcr_image = cv2.merge([sr_y_image, hr_cb_image, hr_cr_image])
+        lr_ycbcr_image = cv2.merge([lr_y_image, hr_cb_image, hr_cr_image])
         sr_image = imgproc.ycbcr2bgr(sr_ycbcr_image)
+        lr_image = imgproc.ycbcr2bgr(lr_ycbcr_image)
         cv2.imwrite(sr_image_path, sr_image * 255.0)
+        cv2.imwrite(lr_image_path, lr_image * 255.0)
 
     print(f"PSNR: {total_psnr / total_files:4.2f}dB.\n")
 

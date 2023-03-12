@@ -20,11 +20,13 @@ import cv2
 import numpy as np
 import torch
 from torchvision.transforms import functional as F
+from scipy import fftpack
 
 __all__ = [
     "image2tensor", "tensor2image",
     "rgb2ycbcr", "bgr2ycbcr", "ycbcr2bgr", "ycbcr2rgb",
     "center_crop", "random_crop", "random_rotate", "random_horizontally_flip", "random_vertically_flip",
+    "dropHighFrequencies",
 ]
 
 
@@ -465,3 +467,42 @@ def random_vertically_flip(lr_image: np.ndarray, hr_image: np.ndarray, p=0.5) ->
         hr_image = cv2.flip(hr_image, 0)
 
     return lr_image, hr_image
+
+def dct2(img):
+    dim0 = fftpack.dct(img, axis=0, norm='ortho')
+    dim1 = fftpack.dct(dim0, axis=1, norm='ortho')
+    dim2 = fftpack.dct(dim1, axis=2, norm='ortho')
+
+    return dim2
+
+
+def idct2(img):
+    dim0 = fftpack.idct(img, axis=0, norm='ortho')
+    dim1 = fftpack.idct(dim0, axis=1, norm='ortho')
+    dim2 = fftpack.idct(dim1, axis=2, norm='ortho')
+
+    return dim2
+
+
+def dropHighFrequencies(hr_image, rate) -> np.array:
+    FIs = dct2(hr_image)
+    Nx, Ny, _ = hr_image.shape
+
+    Rx, Ry = np.int16([rate * Nx, rate * Ny])
+    crop_FIs = FIs[0:Rx, 0:Ry]
+
+    DCT_temp = np.zeros((Nx, Ny, 3))
+
+    DCT_temp[0:Rx, 0:Ry] = crop_FIs
+
+    I_r = idct2(DCT_temp).astype(int)
+
+    Final_Img = np.zeros((Nx, Ny, 3))
+
+    Final_Img[:, :, 0] = I_r[:, :, 0]
+    Final_Img[:, :, 1] = I_r[:, :, 1]
+    Final_Img[:, :, 2] = I_r[:, :, 2]
+
+    lr_image = Final_Img.astype(int)
+
+    return lr_image

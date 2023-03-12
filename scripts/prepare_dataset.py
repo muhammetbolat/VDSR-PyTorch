@@ -21,48 +21,6 @@ from tqdm import tqdm
 
 import data_utils
 
-from scipy import fftpack
-
-
-def dct2(img):
-    dim0 = fftpack.dct(img, axis=0, norm='ortho')
-    dim1 = fftpack.dct(dim0, axis=1, norm='ortho')
-    dim2 = fftpack.dct(dim1, axis=2, norm='ortho')
-
-    return dim2
-
-
-def idct2(img):
-    dim0 = fftpack.idct(img, axis=0, norm='ortho')
-    dim1 = fftpack.idct(dim0, axis=1, norm='ortho')
-    dim2 = fftpack.idct(dim1, axis=2, norm='ortho')
-
-    return dim2
-
-
-def dropHighFrequencies(hr_image, rate) -> np.array:
-    FIs = dct2(hr_image)
-    Nx, Ny, _ = hr_image.shape
-
-    Rx, Ry = np.int16([rate * Nx, rate * Ny])
-    crop_FIs = FIs[0:Rx, 0:Ry]
-
-    DCT_temp = np.zeros((Nx, Ny, 3))
-
-    DCT_temp[0:Rx, 0:Ry] = crop_FIs
-
-    I_r = idct2(DCT_temp).astype(int)
-
-    Final_Img = np.zeros((Nx, Ny, 3))
-
-    Final_Img[:, :, 0] = I_r[:, :, 0]
-    Final_Img[:, :, 1] = I_r[:, :, 1]
-    Final_Img[:, :, 2] = I_r[:, :, 2]
-
-    lr_image = Final_Img.astype(int)
-
-    return lr_image
-
 def main(args) -> None:
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -97,10 +55,7 @@ def worker(image_file_name, args) -> None:
                 # Crop hr image
                 hr_image = image[pos_y: pos_y + args.image_size, pos_x:pos_x + args.image_size, ...]
                 hr_image = np.ascontiguousarray(hr_image)
-                # Resize lr image
-                # lr_image = data_utils.imresize(hr_image, 1 / args.scale)
-                # lr_image = data_utils.imresize(lr_image, args.scale)
-                lr_image = dropHighFrequencies(hr_image, 1 / args.scale)
+                lr_image = data_utils.dropHighFrequencies(hr_image, 1 / args.scale)
                 # Save image
                 cv2.imwrite(
                     f"{args.output_dir}/hr/{image_file_name.split('.')[-2]}_x{args.scale}_{index:04d}.{image_file_name.split('.')[-1]}",
@@ -108,14 +63,14 @@ def worker(image_file_name, args) -> None:
                 cv2.imwrite(
                     f"{args.output_dir}/lr/{image_file_name.split('.')[-2]}_x{args.scale}_{index:04d}.{image_file_name.split('.')[-1]}",
                     lr_image)
-
                 index += 1
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prepare database scripts.")
     parser.add_argument("--images_dir", type=str, help="Path to input image directory.", default="..\data\T91\original")
-    parser.add_argument("--output_dir", type=str, help="Path to generator image directory.", default="..\data\T91\VDSR\\train")
+    parser.add_argument("--output_dir", type=str, help="Path to generator image directory.",
+                        default="..\data\T91\VDSR\\train")
     parser.add_argument("--image_size", type=int, help="Low-resolution image size from raw image.", default=42)
     parser.add_argument("--step", type=int, help="Crop image similar to sliding window.", default=42)
     parser.add_argument("--scale", type=int, help="Image down-scale factor.", default=2)
