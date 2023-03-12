@@ -35,9 +35,9 @@ exp_name = "vdsr_baseline"
 
 if mode == "train":
     # Dataset
-    train_image_dir = "data/TB291/VDSR/train"
-    valid_image_dir = "data/TB291/VDSR/valid"
-    test_image_dir = "data/Set5/GTmod12"
+    train_image_dir = "data\T91\VDSR\\train"
+    valid_image_dir = "data\T91\VDSR\\valid"
+    test_image_dir = "data\Set5\GTmod12"
 
     image_size = 41
     batch_size = 16
