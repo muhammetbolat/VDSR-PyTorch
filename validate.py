@@ -25,6 +25,7 @@ from model import VDSR
 
 
 def main() -> None:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     # Initialize the super-resolution model
     model = VDSR().to(config.device)
     print("Build VDSR model successfully.")
