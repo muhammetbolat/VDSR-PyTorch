@@ -29,7 +29,7 @@ cudnn.benchmark = True
 # Image magnification factor
 upscale_factor = 2
 # Current configuration parameter method
-mode = "valid"
+mode = "train"
 # Experiment name, easy to save weights and log files
 exp_name = "vdsr_baseline"
 
