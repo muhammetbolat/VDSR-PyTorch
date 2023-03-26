@@ -161,6 +161,8 @@ class TestImageDataset(Dataset):
             # Disabling garbage collection after for loop helps speed things up
             gc.disable()
 
+            ############################################################################################################
+            # dct operation
             # Read a batch of image data
             hr_image = cv2.imread(image_file_name, cv2.IMREAD_UNCHANGED)
             # Use high-resolution image to make low-resolution image
@@ -168,6 +170,17 @@ class TestImageDataset(Dataset):
 
             hr_image = hr_image.astype(np.float32) / 255.
             lr_image = lr_image.astype(np.float32) / 255.
+            ############################################################################################################
+            """
+            # bicubic operation
+            # Read a batch of image data
+            hr_image = cv2.imread(image_file_name, cv2.IMREAD_UNCHANGED).astype(np.float32) / 255.
+
+            # Use high-resolution image to make low-resolution image
+            lr_image = imgproc.imresize(hr_image, 1 / self.upscale_factor)
+            lr_image = imgproc.imresize(lr_image, self.upscale_factor)
+            """
+            ############################################################################################################
 
             # Only extract the image data of the Y channel
             lr_y_image = imgproc.bgr2ycbcr(lr_image, use_y_channel=True)

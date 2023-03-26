@@ -29,11 +29,13 @@ import config
 from dataset import CUDAPrefetcher
 from dataset import TrainValidImageDataset, TestImageDataset
 from model import VDSR
+from image_quality_assessment import PSNR, SSIM
 
 
 def main():
     # Initialize training to generate network evaluation indicators
     best_psnr = 0.0
+    best_ssim = 0.0
 
     train_prefetcher, valid_prefetcher, test_prefetcher = load_dataset()
     print("Load train dataset and valid dataset successfully.")
@@ -57,6 +59,7 @@ def main():
         # Restore the parameters in the training node to this point
         config.start_epoch = checkpoint["epoch"]
         best_psnr = checkpoint["best_psnr"]
+        best_ssim = checkpoint["best_ssim"]
         # Load checkpoint state dict. Extract the fitted model weights
         model_state_dict = model.state_dict()
         new_state_dict = {k: v for k, v in checkpoint["state_dict"].items() if k in model_state_dict}
@@ -83,20 +86,34 @@ def main():
     # Initialize the gradient scaler
     scaler = amp.GradScaler()
 
+    # Create an IQA evaluation model
+    psnr_model = PSNR(config.upscale_factor, False)
+    ssim_model = SSIM(config.upscale_factor, False)
+
+    # Transfer the IQA model to the specified device
+    psnr_model = psnr_model.to(device=config.device, memory_format=torch.channels_last, non_blocking=True)
+    ssim_model = ssim_model.to(device=config.device, memory_format=torch.channels_last, non_blocking=True)
+
+
     for epoch in range(config.start_epoch, config.epochs):
         train(model, train_prefetcher, psnr_criterion, pixel_criterion, optimizer, epoch, scaler, writer)
-        _ = validate(model, valid_prefetcher, psnr_criterion, epoch, writer, "Valid")
-        psnr = validate(model, test_prefetcher, psnr_criterion, epoch, writer, "Test")
+        _ = validate(model, valid_prefetcher, epoch, writer, psnr_model, ssim_model, "Valid")
+        # (model, valid_prefetcher, epoch, writer, psnr_model, ssim_model, mode)
+        psnr, ssim = validate(model, test_prefetcher, epoch, writer, psnr_model, ssim_model, "Test")
         print("\n")
 
         # Update lr
         scheduler.step()
 
         # Automatically save the model with the highest index
-        is_best = psnr > best_psnr
+        # Automatically save the model with the highest index
+        is_best = psnr > best_psnr and ssim > best_ssim
         best_psnr = max(psnr, best_psnr)
+        best_ssim = max(ssim, best_ssim)
+
         torch.save({"epoch": epoch + 1,
                     "best_psnr": best_psnr,
+                    "best_ssim": best_ssim,
                     "state_dict": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scheduler": scheduler.state_dict()},
@@ -238,10 +255,11 @@ def train(model, train_prefetcher, psnr_criterion, pixel_criterion, optimizer, e
         batch_index += 1
 
 
-def validate(model, valid_prefetcher, psnr_criterion, epoch, writer, mode) -> float:
+def validate(model, valid_prefetcher, epoch, writer, psnr_model, ssim_model, mode) -> float:
     batch_time = AverageMeter("Time", ":6.3f", Summary.NONE)
-    psnres = AverageMeter("PSNR", ":4.2f", Summary.AVERAGE)
-    progress = ProgressMeter(len(valid_prefetcher), [batch_time, psnres], prefix=f"{mode}: ")
+    psnres = AverageMeter("PSNR", ":4.2f")
+    ssimes = AverageMeter("SSIM", ":4.4f")
+    progress = ProgressMeter(len(valid_prefetcher), [batch_time, psnres, ssimes], prefix=f"{mode}: ")
 
     # Put the model in verification mode
     model.eval()
@@ -257,16 +275,22 @@ def validate(model, valid_prefetcher, psnr_criterion, epoch, writer, mode) -> fl
 
         while batch_data is not None:
             # measure data loading time
-            lr = batch_data["lr"].to(config.device, non_blocking=True)
-            hr = batch_data["hr"].to(config.device, non_blocking=True)
+            lr = batch_data["lr"].to(config.device, memory_format=torch.channels_last, non_blocking=True)
+            hr = batch_data["hr"].to(config.device, memory_format=torch.channels_last, non_blocking=True)
 
             # Mixed precision
             with amp.autocast():
                 sr = model(lr)
 
-            # measure accuracy and record loss
-            psnr = 10. * torch.log10(1. / psnr_criterion(sr, hr))
+            # Statistical loss value for terminal data output
+            psnr = psnr_model(sr, hr)
+            psnr = torch.mean(psnr)
+
+            ssim = ssim_model(sr, hr)
+            ssim = torch.mean(ssim)
+
             psnres.update(psnr.item(), lr.size(0))
+            ssimes.update(ssim.item(), lr.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -285,14 +309,13 @@ def validate(model, valid_prefetcher, psnr_criterion, epoch, writer, mode) -> fl
     # Print average PSNR metrics
     progress.display_summary()
 
-    if mode == "Valid":
-        writer.add_scalar("Valid/PSNR", psnres.avg, epoch + 1)
-    elif mode == "Test":
-        writer.add_scalar("Test/PSNR", psnres.avg, epoch + 1)
+    if mode == "Valid" or mode == "Test":
+        writer.add_scalar(f"{mode}/PSNR", psnres.avg, epoch + 1)
+        writer.add_scalar(f"{mode}/SSIM", ssimes.avg, epoch + 1)
     else:
         raise ValueError("Unsupported mode, please use `Valid` or `Test`.")
 
-    return psnres.avg
+    return psnres.avg, ssimes.avg
 
 
 # Copy form "https://github.com/pytorch/examples/blob/master/imagenet/main.py"
@@ -304,8 +327,6 @@ class Summary(Enum):
 
 
 class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
     def __init__(self, name, fmt=":f", summary_type=Summary.AVERAGE):
         self.name = name
         self.fmt = fmt

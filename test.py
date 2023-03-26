@@ -20,8 +20,11 @@ import torch
 from natsort import natsorted
 
 import config
+import image_quality_assessment
+from image_quality_assessment import PSNR, SSIM
 import imgproc
 from model import VDSR
+from train import AverageMeter
 
 
 def main() -> None:
@@ -51,7 +54,10 @@ def main() -> None:
     model.half()
 
     # Initialize the image evaluation index.
-    total_psnr = 0.0
+    psnr_model = PSNR(config.upscale_factor, False)
+    ssim_model = SSIM(config.upscale_factor, False)
+    psnrMeter = AverageMeter("PSNR", ":4.2f")
+    ssimMeter = AverageMeter("SSIM", ":4.2f")
 
     # Get a list of test image file names.
     file_names = natsorted(os.listdir(config.hr_dir))
@@ -71,11 +77,25 @@ def main() -> None:
         hr_image_width_remainder = hr_image_width % 12
         hr_image = hr_image[:hr_image_height - hr_image_height_remainder, :hr_image_width - hr_image_width_remainder, ...]
 
-        # Make low-resolution image
+
+        ################################################################################################################
+        # dct operation
+        # Use high-resolution image to make low-resolution image
         lr_image = imgproc.dropHighFrequencies(hr_image, 1 / config.upscale_factor)
 
-        hr_image = hr_image.astype(np.float32) / 255.0
-        lr_image = lr_image.astype(np.float32) / 255.0
+        hr_image = hr_image.astype(np.float32) / 255.
+        lr_image = lr_image.astype(np.float32) / 255.
+        """
+        ################################################################################################################
+        # bicubic operation
+        # Read a batch of image data
+
+        # Use high-resolution image to make low-resolution image
+        hr_image = hr_image.astype(np.float32) / 255.
+        lr_image = imgproc.imresize(hr_image, 1 / config.upscale_factor)
+        lr_image = imgproc.imresize(lr_image, config.upscale_factor)
+        """
+        ################################################################################################################
 
         # Convert BGR image to YCbCr image
         lr_ycbcr_image = imgproc.bgr2ycbcr(lr_image, use_y_channel=False)
@@ -93,8 +113,15 @@ def main() -> None:
         with torch.no_grad():
             sr_y_tensor = model(lr_y_tensor).clamp_(0, 1.0)
 
-        # Cal PSNR
-        total_psnr += 10. * torch.log10(1. / torch.mean((sr_y_tensor - hr_y_tensor) ** 2))
+        # Cal PSNR & SSIM
+        #total_psnr += 10. * torch.log10(1. / torch.mean((sr_y_tensor - hr_y_tensor) ** 2))
+        #total_ssim = image_quality_assessment.ssim(sr_y_image, hr_y_image, 0, False)
+
+        psnr = psnr_model.forward(sr_y_tensor, hr_y_tensor)
+        psnrMeter.update(psnr.item())
+
+        ssim = ssim_model.forward(sr_y_tensor, hr_y_tensor)
+        ssimMeter.update(ssim.item())
 
         # Save image
         sr_y_image = imgproc.tensor2image(sr_y_tensor, range_norm=False, half=True)
@@ -106,7 +133,8 @@ def main() -> None:
         cv2.imwrite(sr_image_path, sr_image * 255.0)
         cv2.imwrite(lr_image_path, lr_image * 255.0)
 
-    print(f"PSNR: {total_psnr / total_files:4.2f}dB.\n")
+    print(f"PSNR: {psnrMeter.avg:4.2f} dB")
+    print(f"SSIM: {ssimMeter.avg:4.2f}")
 
 
 if __name__ == "__main__":

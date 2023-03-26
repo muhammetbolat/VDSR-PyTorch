@@ -55,7 +55,14 @@ def worker(image_file_name, args) -> None:
                 # Crop hr image
                 hr_image = image[pos_y: pos_y + args.image_size, pos_x:pos_x + args.image_size, ...]
                 hr_image = np.ascontiguousarray(hr_image)
+                ########################################################################################################
+                # DCT CONVERSION
                 lr_image = data_utils.dropHighFrequencies(hr_image, 1 / args.scale)
+                ########################################################################################################
+                # BICUBIC INTERPOLATION
+                # lr_image = data_utils.imresize(hr_image, 1 / args.scale)
+                # lr_image = data_utils.imresize(lr_image, args.scale)
+                ########################################################################################################
                 # Save image
                 cv2.imwrite(
                     f"{args.output_dir}/hr/{image_file_name.split('.')[-2]}_x{args.scale}_{index:04d}.{image_file_name.split('.')[-1]}",
