@@ -21,6 +21,8 @@ import numpy as np
 import torch
 from torchvision.transforms import functional as F
 from scipy import fftpack
+from PIL import Image
+import io
 
 __all__ = [
     "image2tensor", "tensor2image",
@@ -506,3 +508,20 @@ def dropHighFrequencies(hr_image, rate) -> np.array:
     lr_image = Final_Img.astype(int)
 
     return lr_image
+
+
+def image_to_jpeg(image, quality):
+    # Compress the image and save it as a bytes object
+    image = Image.fromarray(image)
+
+    buffer = io.BytesIO()
+    image.save(buffer, 'JPEG', quality=quality)
+
+    # Open the compressed image from the buffer
+    compressed_image = Image.open(io.BytesIO(buffer.getvalue()))
+
+    # Convert the image to an RGB array
+    rgb_image = compressed_image.convert('RGB')
+    rgb_array = np.array(rgb_image)
+
+    return rgb_array

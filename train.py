@@ -87,8 +87,8 @@ def main():
     scaler = amp.GradScaler()
 
     # Create an IQA evaluation model
-    psnr_model = PSNR(config.upscale_factor, False)
-    ssim_model = SSIM(config.upscale_factor, False)
+    psnr_model = PSNR(4, False)
+    ssim_model = SSIM(4, False)
 
     # Transfer the IQA model to the specified device
     psnr_model = psnr_model.to(device=config.device, memory_format=torch.channels_last, non_blocking=True)

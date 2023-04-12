@@ -34,8 +34,8 @@ def main(args) -> None:
     process_bar = tqdm(valid_files, total=len(valid_files), unit="image", desc="Split train/valid dataset")
 
     for image_file_name in process_bar:
-        shutil.copyfile(f"{args.train_images_dir}/hr/{image_file_name}", f"{args.valid_images_dir}/hr/{image_file_name}")
-        shutil.copyfile(f"{args.train_images_dir}/lr/{image_file_name}", f"{args.valid_images_dir}/lr/{image_file_name}")
+        shutil.move(f"{args.train_images_dir}/hr/{image_file_name}", f"{args.valid_images_dir}/hr/{image_file_name}")
+        shutil.move(f"{args.train_images_dir}/lr/{image_file_name}", f"{args.valid_images_dir}/lr/{image_file_name}")
 
 
 if __name__ == "__main__":

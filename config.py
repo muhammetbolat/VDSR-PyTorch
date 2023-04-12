@@ -27,11 +27,11 @@ device = torch.device("cuda", 0)
 # Turning on when the image size does not change during training can speed up training
 cudnn.benchmark = True
 # Image magnification factor
-upscale_factor = 4
+upscale_factor = 20
 # Current configuration parameter method
 mode = "test"
 # Experiment name, easy to save weights and log files
-exp_name = "vdsr_fintun_baseline_x{}".format(upscale_factor)
+exp_name = "vdsr_jpeg_baseline_x{}".format(upscale_factor)
 
 if mode == "train":
     # Dataset
@@ -45,8 +45,8 @@ if mode == "train":
 
     # Incremental training and migration training
     start_epoch = 0
-    resume = f"results/{exp_name}/init.pth.tar"
-    # resume = ""
+    # resume = f"results/{exp_name}/init.pth.tar"
+    resume = ""
     # Total num epochs
     epochs = 200
 
@@ -67,8 +67,12 @@ if mode == "train":
 
 if mode == "test":
     # Test data address
-    sr_dir = f"results/test/{exp_name}/sr"
-    hr_dir = f"data/Set5/GTmod12"
-    lr_dir = f"results/test/{exp_name}/lr"
+    dataset_list = ["Set5", "Set14", "BSDS100", "BSDS200", "General100", "SunHays80", "Urban100", "Historical"]
+    dataset = dataset_list[1]
+    print("{0} dataset is processing...".format(dataset))
+    # Test data address
+    lr_dir = f"./results/test/{exp_name}/{dataset}/lr"
+    sr_dir = f"./results/test/{exp_name}/{dataset}/sr"
+    hr_dir = f"./data/{dataset}/original"
 
-    model_path = f"results/{exp_name}/last.pth.tar"
+    model_path = f"results/{exp_name}/best.pth.tar"

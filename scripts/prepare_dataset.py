@@ -57,7 +57,8 @@ def worker(image_file_name, args) -> None:
                 hr_image = np.ascontiguousarray(hr_image)
                 ########################################################################################################
                 # DCT CONVERSION
-                lr_image = data_utils.dropHighFrequencies(hr_image, 1 / args.scale)
+                #lr_image = data_utils.dropHighFrequencies(hr_image, 1 / args.scale)
+                lr_image = data_utils.image_to_jpeg(hr_image, args.scale)
                 ########################################################################################################
                 # BICUBIC INTERPOLATION
                 # lr_image = data_utils.imresize(hr_image, 1 / args.scale)

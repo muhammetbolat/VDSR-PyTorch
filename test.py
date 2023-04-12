@@ -39,11 +39,11 @@ def main() -> None:
     print(f"Load VDSR model weights `{os.path.abspath(config.model_path)}` successfully.")
 
     # Create a folder of super-resolution experiment results
-    sr_results_dir = os.path.join("results", "test", config.exp_name, "sr")
+    sr_results_dir = os.path.join("results", "test", config.exp_name, config.dataset, "sr")
     if not os.path.exists(sr_results_dir):
         os.makedirs(sr_results_dir)
 
-    lr_results_dir = os.path.join("results", "test", config.exp_name, "lr")
+    lr_results_dir = os.path.join("results", "test", config.exp_name, config.dataset, "lr")
     if not os.path.exists(lr_results_dir):
         os.makedirs(lr_results_dir)
 
@@ -54,8 +54,8 @@ def main() -> None:
     model.half()
 
     # Initialize the image evaluation index.
-    psnr_model = PSNR(config.upscale_factor, False)
-    ssim_model = SSIM(config.upscale_factor, False)
+    psnr_model = PSNR(4, False)
+    ssim_model = SSIM(4, False)
     psnrMeter = AverageMeter("PSNR", ":4.2f")
     ssimMeter = AverageMeter("SSIM", ":4.2f")
 
@@ -81,7 +81,8 @@ def main() -> None:
         ################################################################################################################
         # dct operation
         # Use high-resolution image to make low-resolution image
-        lr_image = imgproc.dropHighFrequencies(hr_image, 1 / config.upscale_factor)
+        #lr_image = imgproc.dropHighFrequencies(hr_image, 1 / config.upscale_factor)
+        lr_image = imgproc.image_to_jpeg(hr_image, config.upscale_factor)
 
         hr_image = hr_image.astype(np.float32) / 255.
         lr_image = lr_image.astype(np.float32) / 255.
@@ -134,7 +135,7 @@ def main() -> None:
         cv2.imwrite(lr_image_path, lr_image * 255.0)
 
     print(f"PSNR: {psnrMeter.avg:4.2f} dB")
-    print(f"SSIM: {ssimMeter.avg:4.2f}")
+    print(f"SSIM: {ssimMeter.avg:4.4f}")
 
 
 if __name__ == "__main__":

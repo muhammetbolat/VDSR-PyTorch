@@ -166,7 +166,8 @@ class TestImageDataset(Dataset):
             # Read a batch of image data
             hr_image = cv2.imread(image_file_name, cv2.IMREAD_UNCHANGED)
             # Use high-resolution image to make low-resolution image
-            lr_image = imgproc.dropHighFrequencies(hr_image, 1 / self.upscale_factor)
+            # lr_image = imgproc.dropHighFrequencies(hr_image, 1 / self.upscale_factor)
+            lr_image = imgproc.image_to_jpeg(hr_image, self.upscale_factor)
 
             hr_image = hr_image.astype(np.float32) / 255.
             lr_image = lr_image.astype(np.float32) / 255.
